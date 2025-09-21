@@ -1,0 +1,49 @@
+html,body{
+    height:100%;
+    margin:0}
+
+.toolbar{position:fixed;
+    right:12px;
+    top:12px;
+    background:rgba(255,255,255,0.9);
+    padding:8px;
+    border-radius:8px;
+    box-shadow:0 2px 8px rgba(0,0,0,0.12);
+    font-family:system-ui,Segoe UI,Roboto,Arial}
+
+
+/* preview{
+    stroke:#111827;
+    stroke-width:3;
+    stroke-linecap:round;
+    cursor:pointer
+} */
+
+svg{width:100%;
+    height:100%;
+    display:block;
+    background:linear-gradient(180deg,#f8fafc,#eef2f7)}
+
+line.user-line{stroke:#111827;
+    stroke-width:3;
+    stroke-linecap:round;
+    cursor:pointer}
+
+line.preview{stroke:#2563eb;
+    stroke-width:2;
+    stroke-dasharray:6 4;
+    pointer-events:none}
+
+.handle{
+    fill:#f87171;
+    stroke:#b91c1c;
+    stroke-width:1;
+    cursor:move}
+
+.hint{
+    font-size:13px;
+    color:#374151}
+
+button{
+    margin-left:8px
+}
