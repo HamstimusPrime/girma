@@ -34,10 +34,10 @@ line.preview{stroke:#2563eb;
     stroke-dasharray:6 4;
     pointer-events:none}
 
-.handle{
+line.handle{
     fill:#f87171;
     stroke:#b91c1c;
-    stroke-width:1;
+    stroke-width:4;
     cursor:move}
 
 .hint{
