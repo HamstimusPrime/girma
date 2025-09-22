@@ -3,11 +3,14 @@ let isDrawing = false;
 let start = {x: 0, y: 0};
 let previewLine = null;
 
+
 function clientToSvgPoint(clientX, clientY) {//<---This function creates an SVG point and uses a matrix transform to convert screen space inputs to svg coordinates 
     const pt = svg.createSVGPoint();
     pt.x = clientX; pt.y = clientY;
     return pt.matrixTransform(svg.getScreenCTM().inverse());
 }
+
+
 
 // === Drawing logic ===
 svg.addEventListener('pointerdown', (ev) => {
@@ -17,6 +20,7 @@ svg.addEventListener('pointerdown', (ev) => {
     
     const p = clientToSvgPoint(ev.clientX, ev.clientY);
     start.x = p.x; start.y = p.y;
+
     if(isDrawing == false){
         previewLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
         previewLine.setAttribute('class', 'preview');
@@ -30,17 +34,17 @@ svg.addEventListener('pointerdown', (ev) => {
         previewLine.setAttribute('x2', start.x);
         previewLine.setAttribute('y2', start.y);
 
-        svg.releasePointerCapture(ev.pointerId)
+        svg.releasePointerCapture(ev.pointerId);
         
         if(!previewLine)return;
 
-        group = document.createElementNS('http://www.w3.org/2000/svg', 'g')
+        group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
         drawnLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
 
-        x1 = parseFloat(previewLine.getAttribute('x1'));
-        x2 = parseFloat(previewLine.getAttribute('x2'));
-        y1 = parseFloat(previewLine.getAttribute('y1'));
-        y2 = parseFloat(previewLine.getAttribute('y2'));
+        const x1 = parseFloat(previewLine.getAttribute('x1'));
+        const x2 = parseFloat(previewLine.getAttribute('x2'));
+        const y1 = parseFloat(previewLine.getAttribute('y1'));
+        const y2 = parseFloat(previewLine.getAttribute('y2'));
 
         drawnLine.setAttribute('class', 'user-line');
         drawnLine.setAttribute('x1', x1);
@@ -55,23 +59,25 @@ svg.addEventListener('pointerdown', (ev) => {
         isDrawing = false;
 
         const angle = Math.atan2(y2 - y1, x2 - x1);
-        const h1 = createHandle(x1, y1, angle, group);
-        const h2 = createHandle(x2, y2, angle, group);
+        const handle1 = createHandle(x1, y1, angle, group);
+        const handle2 = createHandle(x2, y2, angle, group);
+
+        // === give handles ability to be dragged to resize line ===
     }
 })
 
-// === Add logic for dragging to draw line ===
+// === Add logic for when mouse is moved after first click ===
 svg.addEventListener('pointermove', (ev) =>{
     if (!previewLine) return;
     pt2 = clientToSvgPoint(ev.clientX, ev.clientY)
     previewLine.setAttribute('x2',pt2.x)
     previewLine.setAttribute('y2',pt2.y)
-    lineDrawn = true
-})
+    lineDrawn = true;
+});
 
 // === Add logic for creating handles ===
 function createHandle(x, y, angle, group){
-    const len = 12;
+    const len = 24
     const dx = Math.cos(angle + Math.PI/2) * len/2;
     const dy = Math.sin(angle + Math.PI/2) * len/2;
     const handle = document.createElementNS('http://www.w3.org/2000/svg', 'line');
@@ -84,5 +90,10 @@ function createHandle(x, y, angle, group){
     return handle;
     }
 
+
+// === Add logic for moving handles ===
+function enableHandleDrag(handle, isStartingHandle){
+    let isHandleDragged = false;
+}
 
 
