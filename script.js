@@ -6,7 +6,6 @@ let isHandleDragged = false;
 let isDrawnLineDragged = false;
 const handleLength = 12
 
-
 function clientToSvgPoint(clientX, clientY) {//<---This function creates an SVG point and uses a matrix transform to convert screen space inputs to svg coordinates 
     const pt = svg.createSVGPoint();
     pt.x = clientX; pt.y = clientY;
@@ -73,7 +72,7 @@ svg.addEventListener('pointerdown', (ev) => {
         setEventsForHandles(secondHandle,firstHandle, drawnLine);
 
         // === set events for drawn line ===
-        setEventForDrawnLine(drawnLine, group, previewLine);
+        setEventForDrawnLine(drawnLine, group);
 
         
     }
@@ -157,7 +156,7 @@ function updateHandlePosition(firstHandle, secondHandle, drawnLine){
     secondHandle.setAttribute('y2', pointY2 + dy1);
 }
 
-function setEventForDrawnLine(line, group, previewline) {
+function setEventForDrawnLine(line, group) {
     let startDragPoint = null;
     let groupTransform = { x: 0, y: 0 };
     
