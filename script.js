@@ -1,10 +1,11 @@
 const svg = document.getElementById('svg');
-
 let isDrawing = false;
 let start = {x: 0, y: 0};
 let previewLine = null;
 let isHandleDragged = false;
+let isDrawnLineDragged = false;
 const handleLength = 12
+
 
 function clientToSvgPoint(clientX, clientY) {//<---This function creates an SVG point and uses a matrix transform to convert screen space inputs to svg coordinates 
     const pt = svg.createSVGPoint();
@@ -53,6 +54,7 @@ svg.addEventListener('pointerdown', (ev) => {
         drawnLine.setAttribute('y1', pointY1);
         drawnLine.setAttribute('y2', pointY2);
 
+
         group.appendChild(drawnLine);
         svg.replaceChild(group, previewLine);
 
@@ -70,9 +72,12 @@ svg.addEventListener('pointerdown', (ev) => {
         setEventsForHandles(firstHandle,secondHandle, drawnLine);
         setEventsForHandles(secondHandle,firstHandle, drawnLine);
 
+        // === set events for drawn line ===
+        setEventForDrawnLine(drawnLine, group, previewLine);
+
         
     }
-})
+});
 
 // === Add logic for when mouse is moved to create line endpoint===
 svg.addEventListener('pointermove', (ev) =>{
@@ -96,10 +101,9 @@ function createHandle(x, y, angle, group){
     handle.setAttribute('y2', y + dy);
     group.appendChild(handle);
     return handle;
-    }
+};
 
-
-// === Add logic for moving handles ===
+// === implement events for handles ===
 function setEventsForHandles(handle, pairedHandle,drawnLine){
 
     handle.addEventListener('pointerdown', (e)=>{
@@ -124,14 +128,12 @@ function setEventsForHandles(handle, pairedHandle,drawnLine){
             drawnLine.setAttribute('y2', pointerPosition.y);
             updateHandlePosition(pairedHandle,handle,drawnLine);
         }
-        
     })
 
     handle.addEventListener('pointerup', (e) =>{
         isHandleDragged = false;
 
     })
-
 }
 
 function updateHandlePosition(firstHandle, secondHandle, drawnLine){
@@ -141,8 +143,8 @@ function updateHandlePosition(firstHandle, secondHandle, drawnLine){
     const pointY2 = parseFloat(drawnLine.getAttribute('y2'));
     
     const angle = Math.atan2(pointY2 - pointY1, pointX2 - pointX1);
-    const dx1 = Math.cos(angle + Math.PI/2) * handleLength
-    const dy1 = Math.sin(angle + Math.PI/2) * handleLength
+    const dx1 = Math.cos(angle + Math.PI/2) * handleLength;
+    const dy1 = Math.sin(angle + Math.PI/2) * handleLength;
 
     firstHandle.setAttribute('x1', pointX1 - dx1);
     firstHandle.setAttribute('y1', pointY1 - dy1);
@@ -154,4 +156,87 @@ function updateHandlePosition(firstHandle, secondHandle, drawnLine){
     secondHandle.setAttribute('x2', pointX2 + dx1);
     secondHandle.setAttribute('y2', pointY2 + dy1);
 }
+
+function setEventForDrawnLine(line, group, previewline) {
+    let startDragPoint = null;
+    let groupTransform = { x: 0, y: 0 };
+    
+    line.addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+        isDrawnLineDragged = true;
+        startDragPoint = clientToSvgPoint(e.clientX, e.clientY);
+        
+        // Get current transform
+        const transform = group.getAttribute('transform');
+        if (transform) {
+            const match = transform.match(/translate\(([-\d.]+),([-\d.]+)\)/);
+            if (match) {
+                groupTransform.x = parseFloat(match[1]);
+                groupTransform.y = parseFloat(match[2]);
+            }
+        }
+        line.setPointerCapture(e.pointerId);
+    });
+
+    line.addEventListener('pointermove', (e) => {
+        if (!isDrawnLineDragged || !startDragPoint) return;
+        
+        const currentPoint = clientToSvgPoint(e.clientX, e.clientY);
+        const dx = currentPoint.x - startDragPoint.x;
+        const dy = currentPoint.y - startDragPoint.y;
+        
+        const newX = groupTransform.x + dx;
+        const newY = groupTransform.y + dy;
+        
+        group.setAttribute('transform', `translate(${newX},${newY})`);
+    });
+
+    line.addEventListener('pointerup', (e) => {
+        if (!isDrawnLineDragged) return;
+        
+        isDrawnLineDragged = false;
+        line.releasePointerCapture(e.pointerId);
+        
+        // Update line and handle coordinates to account for translation
+        const transform = group.getAttribute('transform');
+        if (transform) {
+            const match = transform.match(/translate\(([-\d.]+),([-\d.]+)\)/);
+            if (match) {
+                const tx = parseFloat(match[1]);
+                const ty = parseFloat(match[2]);
+                
+                // Reset transform
+                group.setAttribute('transform', '');
+                
+                // Update line coordinates
+                const x1 = parseFloat(line.getAttribute('x1')) + tx;
+                const y1 = parseFloat(line.getAttribute('y1')) + ty;
+                const x2 = parseFloat(line.getAttribute('x2')) + tx;
+                const y2 = parseFloat(line.getAttribute('y2')) + ty;
+                
+                line.setAttribute('x1', x1);
+                line.setAttribute('y1', y1);
+                line.setAttribute('x2', x2);
+                line.setAttribute('y2', y2);
+                
+                // Update handles
+                const handles = group.getElementsByClassName('handle');
+                for (let handle of handles) {
+                    const hx1 = parseFloat(handle.getAttribute('x1')) + tx;
+                    const hy1 = parseFloat(handle.getAttribute('y1')) + ty;
+                    const hx2 = parseFloat(handle.getAttribute('x2')) + tx;
+                    const hy2 = parseFloat(handle.getAttribute('y2')) + ty;
+                    
+                    handle.setAttribute('x1', hx1);
+                    handle.setAttribute('y1', hy1);
+                    handle.setAttribute('x2', hx2);
+                    handle.setAttribute('y2', hy2);
+                }
+            }
+        }
+        
+        groupTransform = { x: 0, y: 0 };
+    });
+}
+
 
