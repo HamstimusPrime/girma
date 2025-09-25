@@ -5,6 +5,8 @@ let previewLine = null;
 let isHandleDragged = false;
 let isDrawnLineDragged = false;
 const handleLength = 12
+tickLength = 20;
+const proportionUnit = 100.00
 
 function clientToSvgPoint(clientX, clientY) {//<---This function creates an SVG point and uses a matrix transform to convert screen space inputs to svg coordinates 
     const pt = svg.createSVGPoint();
@@ -68,13 +70,11 @@ svg.addEventListener('pointerdown', (ev) => {
         secondHandle.setAttribute('isFirstHandle', false);
 
         // === set events for handles ===
-        setEventsForHandles(firstHandle,secondHandle, drawnLine);
-        setEventsForHandles(secondHandle,firstHandle, drawnLine);
+        setEventsForHandles(firstHandle,secondHandle, drawnLine, group);
+        setEventsForHandles(secondHandle,firstHandle, drawnLine, group);
 
         // === set events for drawn line ===
         setEventForDrawnLine(drawnLine, group);
-
-        
     }
 });
 
@@ -103,7 +103,7 @@ function createHandle(x, y, angle, group){
 };
 
 // === implement events for handles ===
-function setEventsForHandles(handle, pairedHandle,drawnLine){
+function setEventsForHandles(handle, pairedHandle,drawnLine, group){
 
     handle.addEventListener('pointerdown', (e)=>{
         if (isHandleDragged == false){
@@ -122,10 +122,17 @@ function setEventsForHandles(handle, pairedHandle,drawnLine){
             drawnLine.setAttribute('x1', pointerPosition.x);
             drawnLine.setAttribute('y1', pointerPosition.y);
             updateHandlePosition(handle,pairedHandle,drawnLine);
+            tickMarkPositions = getTickMarkPositions(drawnLine, proportionUnit);
+            createTick(tickMarkPositions, drawnLine, group);
+
         }else{
             drawnLine.setAttribute('x2', pointerPosition.x);
             drawnLine.setAttribute('y2', pointerPosition.y);
             updateHandlePosition(pairedHandle,handle,drawnLine);
+            tickMarkPositions = getTickMarkPositions(drawnLine, proportionUnit);
+            ticks = createTick(tickMarkPositions, drawnLine, group);
+
+            
         }
     })
 
@@ -180,14 +187,18 @@ function setEventForDrawnLine(line, group) {
     line.addEventListener('pointermove', (e) => {
         if (!isDrawnLineDragged || !startDragPoint) return;
         
-        const currentPoint = clientToSvgPoint(e.clientX, e.clientY);
-        const dx = currentPoint.x - startDragPoint.x;
-        const dy = currentPoint.y - startDragPoint.y;
+        const currentPointerPosition = clientToSvgPoint(e.clientX, e.clientY);
+        const dx = currentPointerPosition.x - startDragPoint.x;
+        const dy = currentPointerPosition.y - startDragPoint.y;
         
         const newX = groupTransform.x + dx;
         const newY = groupTransform.y + dy;
         
         group.setAttribute('transform', `translate(${newX},${newY})`);
+
+        // Update tick marks with transform
+        const tickMarkPositions = getTickMarkPositions(line, proportionUnit);
+        createTick(tickMarkPositions, line, group);
     });
 
     line.addEventListener('pointerup', (e) => {
@@ -197,17 +208,19 @@ function setEventForDrawnLine(line, group) {
         line.releasePointerCapture(e.pointerId);
         
         // Update line and handle coordinates to account for translation
+        //get transform of the group containing the drawn line and handles
         const transform = group.getAttribute('transform');
         if (transform) {
             const match = transform.match(/translate\(([-\d.]+),([-\d.]+)\)/);
             if (match) {
+                //store the x and y coordinates of the groups transform
                 const tx = parseFloat(match[1]);
                 const ty = parseFloat(match[2]);
                 
-                // Reset transform
+                // Reset transform of the group
                 group.setAttribute('transform', '');
                 
-                // Update line coordinates
+                // Update line coordinates. set drawn line position by adding stored group transform to it
                 const x1 = parseFloat(line.getAttribute('x1')) + tx;
                 const y1 = parseFloat(line.getAttribute('y1')) + ty;
                 const x2 = parseFloat(line.getAttribute('x2')) + tx;
@@ -233,9 +246,94 @@ function setEventForDrawnLine(line, group) {
                 }
             }
         }
+        //implement handles translation
+        if (handles){
+
+        }
         
         groupTransform = { x: 0, y: 0 };
     });
 }
 
+// === implement proportion ticks ===
+
+function getTickMarkPositions(line, proportionUnit) {
+    let tickMarkPositions = [];
+    
+    const x1 = parseFloat(line.getAttribute("x1"));
+    const y1 = parseFloat(line.getAttribute("y1"));
+    const x2 = parseFloat(line.getAttribute("x2"));
+    const y2 = parseFloat(line.getAttribute("y2"));
+
+    const lineLength = Math.hypot(x2 - x1, y2 - y1);
+    const numberOfTicks = Math.floor(lineLength / proportionUnit);
+
+    // Calculate direction vector of the line
+    const dirX = (x2 - x1) / lineLength;
+    const dirY = (y2 - y1) / lineLength;
+
+    if (numberOfTicks > 0) {
+        for (let i = 1; i <= numberOfTicks; i++) {
+            // Calculate position along the line
+            const distance = i * proportionUnit;
+            const pointX = x1 + dirX * distance;
+            const pointY = y1 + dirY * distance;
+            
+            tickMarkPositions.push({x: pointX, y: pointY});
+        }
+    }
+
+    return tickMarkPositions;
+}
+
+function createTick(tickMarkPositions, line, group) {
+    // Remove any existing tick marks
+    const existingTicks = group.getElementsByClassName('tickmark');
+    while (existingTicks.length > 0) {
+        existingTicks[0].remove();
+    }
+
+    if (tickMarkPositions.length === 0) {
+        return;
+    }
+
+    // Get current transform
+    const transform = group.getAttribute('transform');
+    let tx = 0, ty = 0;
+    if (transform) {
+        const match = transform.match(/translate\(([-\d.]+),([-\d.]+)\)/);
+        if (match) {
+            tx = parseFloat(match[1]);
+            ty = parseFloat(match[2]);
+        }
+    }
+
+    const x1 = parseFloat(line.getAttribute('x1'));
+    const x2 = parseFloat(line.getAttribute('x2'));
+    const y1 = parseFloat(line.getAttribute('y1'));
+    const y2 = parseFloat(line.getAttribute('y2'));
+
+    const angle = Math.atan2(y2 - y1, x2 - x1);
+
+    ticksCreated = [];
+    
+    for (let pos of tickMarkPositions) {
+        const dx = Math.cos(angle + Math.PI/2) * tickLength/2;
+        const dy = Math.sin(angle + Math.PI/2) * tickLength/2;
+
+        const tickmark = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        tickmark.setAttribute('class', 'tickmark');
+        
+        // Apply transform offset to tick mark positions
+        tickmark.setAttribute('x1', pos.x - dx - tx);
+        tickmark.setAttribute('y1', pos.y - dy - ty);
+        tickmark.setAttribute('x2', pos.x + dx - tx);
+        tickmark.setAttribute('y2', pos.y + dy - ty);
+
+        group.appendChild(tickmark);
+        ticksCreated.push(tickmark);
+    }
+
+    return ticksCreated;
+}
 

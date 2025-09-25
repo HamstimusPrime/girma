@@ -40,6 +40,13 @@ line.handle{
     stroke-width:4;
     cursor:move}
 
+
+line.tickmark{
+    fill:#f87171;
+    stroke:#00ff1a;
+    stroke-width:8;
+    cursor:move}
+
 .hint{
     font-size:13px;
     color:#374151}
