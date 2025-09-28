@@ -45,14 +45,15 @@ class DrawingCanvas{
             const previewLinePoints = this.previewLine.getPointsPosition()
             const line = new Line(this.svg, previewLinePoints.x1, previewLinePoints.x2, previewLinePoints.y1, previewLinePoints.y2);
             line.createLineElement();
-
-            const handles = new LineHandles(this.svg, line);
             
-
-
+            const handles = new LineHandles(this.svg, line);
+            handles.createHandles();
+            
+            
             //class to create handles on line
             
             //replace preview line with drawn-line
+            
             const lineElement = line.getElement()
             const previewLineElement = this.previewLine.getElement();
             this.svg.replaceChild(lineElement, previewLineElement);
@@ -157,6 +158,7 @@ class Handle extends Line{
     }
 
     createLineHandle(){
+        this.createLineElement();
         const dx = Math.cos(this.parentLineAngle + Math.PI / 2) * this.handleLength / 2;
         const dy = Math.sin(this.parentLineAngle + Math.PI / 2) * this.handleLength / 2;
         this.lineElement.setAttribute('x1', this.pointX1 - dx);
@@ -181,16 +183,18 @@ class LineHandles {
         this.secondHandle = null;
         this.parentLine = parentLine;
         this.group = group;
+        this.parentLineAngle = parentLine.getLineAngle()
     }
 
     createHandles(){
         if (!this.parentLine)return;
         const parentLinePoints = this.parentLine.getPointsPosition();
-        this.firstHandle = new Handle(this.svg,parentLinePoints.x1, parentLinePoints.y1);
-        this.secondHandle = new Handle(this.svg,parentLinePoints.x2, parentLinePoints.y2);
-        
-        this.firstHandle.createLineElement();
-        this.secondHandle.createLineElement();
+        this.firstHandle = new Handle(this.svg,parentLinePoints.x1, parentLinePoints.y1, this.parentLineAngle);
+        this.firstHandle.createLineHandle();
+
+        this.secondHandle = new Handle(this.svg,parentLinePoints.x2, parentLinePoints.y2, this.parentLineAngle);
+        this.secondHandle.createLineHandle();
+    
 
 
     }
