@@ -15,18 +15,31 @@ class DrawingCanvas{
     }
 
     setupSVGeventListeners() {
-        this.svg.addEventListener('pointerdown', this.handleSVGPointerDown.bind(this));
-        this.svg.addEventListener('pointermove', this.handleSVGPointerMove.bind(this));
+        // this.svg.addEventListener('pointerdown', this.handleSVGPointerDown.bind(this));
+        // this.svg.addEventListener('pointermove', this.handleSVGPointerMove.bind(this));
+        // this.svg.addEventListener('pointerdown', this.testHandleSVGPointerClick.bind(this));
     }
 
-    // === event handlers ===
 
+    testHandleSVGPointerClick(event){
+        if (!event.isPrimary)return;
+        if(this.dragState.isHandleDragged)return;
+        event.preventDefault();
+        this.svg.setPointerCapture(event.pointerId);
+        this.pointerPosition = SvgUtils.clientToSvgPoint(this.svg, event.clientX, event.clientY);
+
+        //create handle lines
+
+
+        console.log("click occurred on svg element");
+    }
+
+    
     handleSVGPointerDown(event){
         if (!event.isPrimary)return;
         if(this.dragState.isHandleDragged)return;
         event.preventDefault();
         this.svg.setPointerCapture(event.pointerId);
-
         this.pointerPosition = SvgUtils.clientToSvgPoint(this.svg, event.clientX, event.clientY);
 
         if (this.isDrawing == false){
@@ -42,20 +55,19 @@ class DrawingCanvas{
             this.svg.releasePointerCapture(event.pointerId);
 
             // use previewLine data to create drawnline
-            const previewLinePoints = this.previewLine.getPointsPosition()
-            const line = new Line(this.svg, previewLinePoints.x1, previewLinePoints.x2, previewLinePoints.y1, previewLinePoints.y2);
-            line.createLineElement();
+            // const previewLinePoints = this.previewLine.getPointsPosition()
+            // const line = new HandleLine(this.svg, previewLinePoints.x1, previewLinePoints.x2, previewLinePoints.y1, previewLinePoints.y2);
+            // line.createHandleLine();
             
-            const handles = new LineHandles(this.svg, line);
-            handles.createHandles();
+            
             
             
             //class to create handles on line
             
             //replace preview line with drawn-line
             
-            const lineElement = line.getElement()
-            const previewLineElement = this.previewLine.getElement();
+            // const lineElement = line.getElement()
+            // const previewLineElement = this.previewLine.getElement();
             this.svg.replaceChild(lineElement, previewLineElement);
             this.previewLine = null;
             
@@ -78,21 +90,24 @@ class DrawingCanvas{
 */
 
 class Line{
-    constructor(svg, pointX1, pointX2, pointY1, pointY2){
+    constructor(svg, pointX1, pointX2, pointY1, pointY2, group = null){
         this.svg = svg;
+        this.groupElement = group;
         this.pointX1 = pointX1;
         this.pointX2 = pointX2;
         this.pointY1 = pointY1;
         this.pointY2 = pointY2;
         this.handles = [];
         this.className = 'user-line'
-        // this.group = this.createGroup();
         this.lineElement = null;
         this.lineAngle = this.getLineAngle()
-        //create the start point of a line
-        
-    
+        if (this.groupElement !== null) {
+            this.addElementToGroup();
+        }
     }
+    
+    addElementToGroup(){}
+
     createLineElement(){
         const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
         line.setAttribute('class', this.className);
@@ -103,6 +118,8 @@ class Line{
         
         this.lineElement = line;
         this.appendToSVG();
+
+        return this.lineElement;
     }
 
     appendToSVG(){
@@ -140,6 +157,11 @@ class Line{
 
         return linePointsPosition;
     }
+
+    setGroup(group){
+        this.groupElement = group;
+        this.groupElement.appendChild(this.lineElement);
+    }
 }
 
 class PreviewLine extends Line {
@@ -150,11 +172,14 @@ class PreviewLine extends Line {
 }
 
 class Handle extends Line{
-    constructor( svg, pointX1, pointY1,parentLineAngle,handleLength = 24 ){
-        super(svg, pointX1, pointX1,pointY1, pointY1);
+    constructor( svg, pointX1,pointY1,parentLine = null,handleLength = 24, group = null ){
+        super(svg, pointX1, pointX1,pointY1, pointY1, group);
         this.handleLength = handleLength;
         this.className = 'handle'
-        this.parentLineAngle = parentLineAngle;
+        this.parentLine = null;
+        this.parentLine = parentLine;
+        this.parentLineAngle = this.getParentLineAngle();
+        this.pairHandle = null
     }
 
     createLineHandle(){
@@ -166,40 +191,88 @@ class Handle extends Line{
         this.lineElement.setAttribute('y1', this.pointY1 - dy);
         this.lineElement.setAttribute('y2', this.pointY1 + dy);
 
+        
 
         return this.lineElement;
     }
+
+
+    getParentLineAngle(){
+        if (!this.parentLine){
+            console.log('no parent line provided to handle')
+            return};
+        const parentLineAngle = this.parentLine.getLineAngle()
+        return parentLineAngle
+    };
+
+    setupHandleEventListeners(){}
 
     handlerHandlePointerDown(event){
 
     }
 }
 
-class LineHandles {
-    constructor(svg, parentLine = null, group = null){
+class Handles {
+    constructor(svg, parentLine = null){
         this.svg = svg
         this.parentLine = parentLine;
         this.firstHandle = null;
         this.secondHandle = null;
         this.parentLine = parentLine;
-        this.group = group;
-        this.parentLineAngle = parentLine.getLineAngle()
+        this.group = null;
     }
 
     createHandles(){
         if (!this.parentLine)return;
         const parentLinePoints = this.parentLine.getPointsPosition();
-        this.firstHandle = new Handle(this.svg,parentLinePoints.x1, parentLinePoints.y1, this.parentLineAngle);
+        this.firstHandle = new Handle(this.svg,parentLinePoints.x1, parentLinePoints.y1, this.parentLine);
         this.firstHandle.createLineHandle();
 
-        this.secondHandle = new Handle(this.svg,parentLinePoints.x2, parentLinePoints.y2, this.parentLineAngle);
+        this.secondHandle = new Handle(this.svg,parentLinePoints.x2, parentLinePoints.y2, this.parentLine);
         this.secondHandle.createLineHandle();
-    
 
+        //insert handles and drawn line into group
+        this.createHandlesGroup();
+
+        const firstHandleElement = this.firstHandle.getElement();
+        const secondHandleElement = this.secondHandle.getElement();
+        const lineElement = this.parentLine.getElement();
+
+        this.insertElementIntoGroup(firstHandleElement);
+        this.insertElementIntoGroup(secondHandleElement);
+        this.insertElementIntoGroup(lineElement);
 
     }
+
+    createHandlesGroup(){
+        group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        this.group = group;
+        return this.group;
+    }
+
+    insertElementIntoGroup(element){
+        if (!this.group){
+            console.error("group not created");
+            return;
+        }
+        this.group.appendChild(element);
+    }
+
+
 }
 
+
+class HandleLine extends Line{
+    constructor(svg, pointX1, pointX2, pointY1, pointY2){
+        super(svg, pointX1, pointX2, pointY1, pointY2);
+    }
+
+    createHandleLine(){
+        const line = this.createLineElement()
+        const handles = new LineHandles(this.svg, line);
+        handles.createHandles();
+    }
+}
 
 
 

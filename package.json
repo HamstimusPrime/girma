@@ -1,0 +1,20 @@
+{
+  "name": "girma",
+  "version": "1.0.0",
+  "main": "reference_script (1).js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HamstimusPrime/girma.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/HamstimusPrime/girma/issues"
+  },
+  "homepage": "https://github.com/HamstimusPrime/girma#readme",
+  "description": ""
+}
