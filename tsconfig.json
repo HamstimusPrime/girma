@@ -1,11 +1,28 @@
+// {
+//   "compilerOptions": {
+//     "lib": ["esnext", "dom", "dom.iterable"],
+//     "target": "es2015",
+//     "strict": true,
+//     "verbatimModuleSyntax": true,
+//     "esModuleInterop": true,
+//     "noUncheckedIndexedAccess": true
+//   }
+// }
+
 {
   "compilerOptions": {
-    "lib": ["esnext","dom","dom.iterable"],
-    "target": "esnext",
+    "lib": ["esnext", "dom", "dom.iterable"],
+    "target": "es2015",
+    "module": "none",
+    "moduleResolution": "node",
     "strict": true,
-    "verbatimModuleSyntax": true,
     "esModuleInterop": true,
-    "moduleDetection": "force",
-    "noUncheckedIndexedAccess": true 
-  }
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "outDir": "./",
+    "noEmit": false,
+    "isolatedModules": false
+  },
+  "include": ["*.ts"],
+  "exclude": ["node_modules"]
 }
