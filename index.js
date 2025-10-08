@@ -49,13 +49,16 @@ class DrawingCanvas {
             const previewLineEndpoints = this.previewLine.getLineEndpoints();
             const firstPreviewLinePoint = previewLineEndpoints === null || previewLineEndpoints === void 0 ? void 0 : previewLineEndpoints.get("point1");
             const secondPreviewLinePoint = previewLineEndpoints === null || previewLineEndpoints === void 0 ? void 0 : previewLineEndpoints.get("point2");
-            if (firstPreviewLinePoint && secondPreviewLinePoint) {
-                console.log("juranimo");
-                const drawnLineObj = new Line(this.svg, firstPreviewLinePoint, secondPreviewLinePoint);
-                const drawnLine = drawnLineObj.createLineElement();
-                this.svg.replaceChild(drawnLine, this.previewLine.getLineObject());
-                this.isDrawing = false;
+            if (!firstPreviewLinePoint || !secondPreviewLinePoint) {
+                throw new Error("could not get previewLine endpoints.");
             }
+            console.log("juranimo");
+            const drawnLineObj = new Line(this.svg, firstPreviewLinePoint, secondPreviewLinePoint);
+            const drawnLine = drawnLineObj.createLineElement();
+            this.svg.replaceChild(drawnLine, this.previewLine.getLineObject());
+            const handle = new Handle(this.svg, drawnLineObj, false);
+            handle.createHandle();
+            this.isDrawing = false;
         }
     }
 }
@@ -64,9 +67,9 @@ class Line {
         this.svg = svg;
         this.point1 = point1;
         this.point2 = point2;
-        this.handles = [];
         this.className = 'user-line';
         this.lineElement = null;
+        this.setupLineEventListeners();
     }
     createLineElement() {
         const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
@@ -77,6 +80,9 @@ class Line {
         line.setAttribute('y2', `${this.point2.y}`);
         this.lineElement = line;
         this.svg.appendChild(this.lineElement);
+        if (!this.lineElement) {
+            throw new Error("Failed to create line element");
+        }
         return this.lineElement;
     }
     setLineEndPoint(endPoint) {
@@ -95,17 +101,65 @@ class Line {
         endPoints.set('point2', point2);
         return endPoints;
     }
+    getLineAngle() {
+        const parentLinePoints = this.getLineEndpoints();
+        const firstPoint = parentLinePoints === null || parentLinePoints === void 0 ? void 0 : parentLinePoints.get("point1");
+        const secondPoint = parentLinePoints === null || parentLinePoints === void 0 ? void 0 : parentLinePoints.get("point2");
+        if (!firstPoint || !secondPoint) {
+            throw new Error("Line element is not initialized.");
+        }
+        const angle = Math.atan2(secondPoint.y - firstPoint.y, secondPoint.x - firstPoint.x);
+        return angle;
+    }
     getLineObject() {
         if (!this.lineElement) {
             throw new Error("Line element is not initialized.");
         }
         return this.lineElement;
     }
+    setupLineEventListeners() {
+        if (!this.lineElement)
+            return;
+        this.lineElement.addEventListener('pointerdown', this.handleLinePointerDown.bind(this));
+    }
+    handleLinePointerDown(event) {
+        var _a;
+        console.log("line clicked!!!");
+        (_a = this.lineElement) === null || _a === void 0 ? void 0 : _a.setPointerCapture(event.pointerId);
+    }
 }
 class PreviewLine extends Line {
     constructor(svg, point1) {
         super(svg, point1, point1);
         this.className = 'preview';
+    }
+}
+class Handle extends Line {
+    constructor(svg, parentLine, isFirstHandle) {
+        const temporaryPoint = { x: 0, y: 0 };
+        super(svg, temporaryPoint, temporaryPoint);
+        this.parentLine = parentLine;
+        this.isFirstHandle = isFirstHandle;
+        this.handleLength = 24;
+        this.className = 'handle';
+    }
+    createHandle() {
+        var _a, _b, _c, _d, _e, _f;
+        /* A handle needs the angle and endpoints of its parent line */
+        const parentLineAngle = this.parentLine.getLineAngle();
+        const parentPoint1 = (_a = this.parentLine.getLineEndpoints()) === null || _a === void 0 ? void 0 : _a.get("point1");
+        const parentPoint2 = (_b = this.parentLine.getLineEndpoints()) === null || _b === void 0 ? void 0 : _b.get("point2");
+        const dx = Math.cos(parentLineAngle + Math.PI / 2) * this.handleLength / 2;
+        const dy = Math.sin(parentLineAngle + Math.PI / 2) * this.handleLength / 2;
+        if (!parentPoint1 || !parentPoint2) {
+            throw new Error("Line element is not initialized.");
+        }
+        this.createLineElement();
+        const anchorPoint = this.isFirstHandle ? parentPoint1 : parentPoint2;
+        (_c = this.lineElement) === null || _c === void 0 ? void 0 : _c.setAttribute('x1', `${anchorPoint.x - dx}`);
+        (_d = this.lineElement) === null || _d === void 0 ? void 0 : _d.setAttribute('y1', `${anchorPoint.y - dy}`);
+        (_e = this.lineElement) === null || _e === void 0 ? void 0 : _e.setAttribute('x2', `${anchorPoint.x + dx}`);
+        (_f = this.lineElement) === null || _f === void 0 ? void 0 : _f.setAttribute('y2', `${anchorPoint.y + dy}`);
     }
 }
 class SvgUtils {
