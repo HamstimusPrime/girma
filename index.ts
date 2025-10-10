@@ -4,6 +4,14 @@ type DragState = {
     activeElement: SVGElement | null;
 }
 
+class State {
+    static dragState: DragState = {
+    isHandleDragged: false,
+    isDrawnLineDragged: false,
+    activeElement: null
+    }
+}
+
 type Point = {
     x: number;
     y: number;
@@ -15,7 +23,7 @@ class DrawingCanvas{
     private currentLine : SVGLineElement | null;
     private previewLine : PreviewLine | null;
     private pointerPosition : Point;
-    private dragState : DragState
+
 
     constructor(svgElement: SVGSVGElement){
         this.svg = svgElement;
@@ -24,29 +32,24 @@ class DrawingCanvas{
         this.previewLine = null;
         this.pointerPosition = {x:0, y:0};
         this.setupSVGeventListeners();
-        this.dragState = {
-            isHandleDragged: false,
-            isDrawnLineDragged: false,
-            activeElement: null
-        };
     }
 
     private setupSVGeventListeners():void{
-        this.svg.addEventListener('pointerdown', this.handleSVGPointerDown.bind(this));
-        this.svg.addEventListener('pointermove', this.handleSVGPointerMove.bind(this));
+        this.svg.addEventListener('pointerdown', this.svgEventPointerDown.bind(this));
+        this.svg.addEventListener('pointermove', this.svgEventPointerMove.bind(this));
     }
 
-    private handleSVGPointerMove(event:PointerEvent):void{
+    private svgEventPointerMove(event:PointerEvent):void{
         if (!this.previewLine) return;
 
         const eventPosition = { x: event.clientX, y: event.clientY };
         this.pointerPosition = SvgUtils.clientToSvgPoint(this.svg,eventPosition);
-        this.previewLine.setLineEndPoint(this.pointerPosition);
+        this.previewLine.setLineEndPoint(this.pointerPosition, "x2", "y2");
     }
 
-    private handleSVGPointerDown(event:PointerEvent):void{
+    private svgEventPointerDown(event:PointerEvent):void{
         if(!event.isPrimary)return;
-        if(this.dragState.isHandleDragged)return;
+        if(State.dragState.isHandleDragged)return;
         event.preventDefault();
         this.svg.setPointerCapture(event.pointerId)
 
@@ -61,7 +64,7 @@ class DrawingCanvas{
             this.isDrawing = true;
         }else{
             if(!this.previewLine)return;
-            this.previewLine.setLineEndPoint(this.pointerPosition)
+            this.previewLine.setLineEndPoint(this.pointerPosition, "x2", "y2")
             this.svg.releasePointerCapture(event.pointerId)
 
             //get endpoints of previewLine
@@ -73,12 +76,8 @@ class DrawingCanvas{
                 throw new Error("could not get previewLine endpoints.");
             }
             console.log("juranimo")
-            const drawnLineObj = new Line(this.svg, firstPreviewLinePoint, secondPreviewLinePoint);
-            const drawnLine = drawnLineObj.createLineElement();
-            this.svg.replaceChild(drawnLine ,this.previewLine.getLineObject())
-            const handle = new Handle(this.svg, drawnLineObj, false);
-            handle.createHandle();
-            this.isDrawing = false;
+            const handleLine = new HandleLine(this.svg, firstPreviewLinePoint, secondPreviewLinePoint);
+            handleLine.createHandleLine();
         
         }
     }
@@ -119,11 +118,13 @@ class Line{
         return this.lineElement
     }
 
-    setLineEndPoint(endPoint: Point){
+    setLineEndPoint(endPoint: Point,xCoord: string, yCoord: string){
         if (!this.lineElement)return;
-        this.lineElement.setAttribute('x2', `${endPoint.x}`)
-        this.lineElement.setAttribute('y2', `${endPoint.y}`)
+        this.lineElement.setAttribute(`${xCoord}`, `${endPoint.x}`)
+        this.lineElement.setAttribute(`${yCoord}`, `${endPoint.y}`)
     }
+
+    updateLinePosition(){}
 
     getLineEndpoints(): Map<string, Point> | null {
         if(!this.lineElement)return null;
@@ -157,10 +158,10 @@ class Line{
 
     private setupLineEventListeners(): void{
         if (!this.lineElement)return;
-        this.lineElement.addEventListener('pointerdown',this.handleLinePointerDown.bind(this));
+        this.lineElement.addEventListener('pointerdown',this.lineEventPointerDown.bind(this));
     }
 
-    private handleLinePointerDown(event: PointerEvent){
+    private lineEventPointerDown(event: PointerEvent){
         console.log("line clicked!!!")
         this.lineElement?.setPointerCapture(event.pointerId)
         
@@ -176,8 +177,8 @@ class PreviewLine extends Line{
 
 class Handle extends Line{
     private parentLine : Line;
-    private isFirstHandle : boolean | null;
     private handleLength : number
+    isFirstHandle : boolean | null;
 
     constructor(svg:SVGSVGElement, parentLine: Line, isFirstHandle: boolean){
         const temporaryPoint = { x: 0, y: 0 };
@@ -187,6 +188,7 @@ class Handle extends Line{
         this.isFirstHandle = isFirstHandle;
         this.handleLength = 24
         this.className = 'handle'
+
     }
 
     createHandle(){
@@ -210,6 +212,83 @@ class Handle extends Line{
         this.lineElement?.setAttribute('x2', `${anchorPoint.x + dx}`); 
         this.lineElement?.setAttribute('y2', `${anchorPoint.y + dy}`); 
     }
+
+    }
+
+
+class HandleLine{
+    /*Important!! the handle line is responsible for setting 
+    every event for the handles BUT it should be setup to take in optional lines
+    such as tick lines and lets them setup their own events */
+    svg : SVGSVGElement
+    point1 : Point;
+    point2 : Point;
+    firstHandle : Handle | null;
+    secondHandle : Handle | null;
+    middleLine : Line | null;
+
+    constructor(svg: SVGSVGElement, point1:Point, point2: Point){
+        this.svg = svg;
+        this.point1 = point1;
+        this.point2 = point2;
+        this.firstHandle = null;
+        this.secondHandle = null;
+        this.middleLine = null;
+    }
+
+    createHandleLine(){
+        //create handles and Line and then setup events for both handles
+        this.middleLine = new Line(this.svg,this.point1,this.point2);
+        this.middleLine.createLineElement();
+
+        //create Handles
+        const firstHandle = new Handle(this.svg,this.middleLine,true)
+        firstHandle.createHandle()
+        this.setHandleEvents(firstHandle);
+        //setup events for line handles
+    }
+
+    setHandleEvents(handle: Handle){
+        //i have to pass Handle to each event list
+
+        const handleElement = handle.getLineObject();
+        handleElement.addEventListener('pointerdown', this.handleEventPointerDown.bind(this));
+        handleElement.addEventListener('pointerup', this.handleEventPointerUp.bind(this));
+        handleElement.addEventListener('pointermove', (event)=>{this.handleEventPointerMove(event,handle)});
+    };
+    
+
+    private handleEventPointerDown(event: PointerEvent){
+        if (!event.isPrimary) return;
+        event.preventDefault();
+        event.stopPropagation();
+
+        if(State.dragState.isHandleDragged == false){
+
+            State.dragState.isHandleDragged = true;
+            const target = event.currentTarget as Element;
+            target.setPointerCapture(event.pointerId);
+            console.log(`handle clicked. isHandleDragged: ${State.dragState.isHandleDragged}`)
+        }
+    }
+
+    private handleEventPointerUp(event: PointerEvent){
+        State.dragState.isHandleDragged == false
+    }
+
+    private handleEventPointerMove(event: PointerEvent, handle :Handle){
+        if (State.dragState.isHandleDragged == false) return;
+        const eventPosition = { x: event.clientX, y: event.clientY };
+        const pointerPosition = SvgUtils.clientToSvgPoint(this.svg, eventPosition);
+
+        if (!State.dragState.isHandleDragged) return;
+        console.log("handle moved")
+
+        const xAttr = handle.isFirstHandle ? 'x1' : 'x2';
+        const yAttr = handle.isFirstHandle ? 'y1' : 'y2';
+
+        this.middleLine?.setLineEndPoint(pointerPosition,xAttr,yAttr);
+}
 }
 
 
@@ -236,7 +315,6 @@ function initializeApp(){
 }
 
 //App entry point
-
 document.addEventListener('DOMContentLoaded', ()=>{
     const app = initializeApp();
 })
