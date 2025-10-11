@@ -69,7 +69,7 @@ class DrawingCanvas{
             this.svg.releasePointerCapture(event.pointerId)
 
             //get endpoints of previewLine
-            const previewLineEndpoints = this.previewLine.getLineEndpoints();
+            const previewLineEndpoints = this.previewLine.getLineEndPoints();
             const firstPreviewLinePoint = previewLineEndpoints?.get("point1"); 
             const secondPreviewLinePoint = previewLineEndpoints?.get("point2");
 
@@ -128,9 +128,15 @@ class Line{
         this.lineElement.setAttribute(`${yCoord}`, `${endPoint.y}`)
     }
 
-    updateLinePosition(){}
+    updateLinePosition(point1 : Point, point2 : Point){
+        if (!this.lineElement)return;
+        this.lineElement.setAttribute('x1', `${point1.x}`);
+        this.lineElement.setAttribute('y1', `${point1.y}`);
+        this.lineElement.setAttribute('x2', `${point2.x}`);
+        this.lineElement.setAttribute('y2', `${point2.y}`);
+    }
 
-    getLineEndpoints(): Map<string, Point> | null {
+    getLineEndPoints(): Map<string, Point> | null {
         if(!this.lineElement)return null;
         const endPoints = new Map<string, Point>();
         const point1: Point = { x: parseFloat(this.lineElement.getAttribute('x1') || '0'), y: parseFloat(this.lineElement.getAttribute('y1') || '0') };
@@ -141,7 +147,7 @@ class Line{
     }
 
     getLineAngle():number{
-        const parentLinePoints = this.getLineEndpoints()
+        const parentLinePoints = this.getLineEndPoints()
         const firstPoint = parentLinePoints?.get("point1"); 
         const secondPoint = parentLinePoints?.get("point2");
 
@@ -181,7 +187,7 @@ class PreviewLine extends Line{
 
 class Handle extends Line{
     private parentLine : Line;
-    private handleLength : number
+    handleLength : number
     isFirstHandle : boolean | null;
 
     constructor(svg:SVGSVGElement, parentLine: Line, isFirstHandle: boolean){
@@ -198,8 +204,8 @@ class Handle extends Line{
     createHandle(){
         /* A handle needs the angle and endpoints of its parent line */
         const parentLineAngle = this.parentLine.getLineAngle();
-        const parentPoint1 = this.parentLine.getLineEndpoints()?.get("point1");
-        const parentPoint2 = this.parentLine.getLineEndpoints()?.get("point2");
+        const parentPoint1 = this.parentLine.getLineEndPoints()?.get("point1");
+        const parentPoint2 = this.parentLine.getLineEndPoints()?.get("point2");
 
         const dx = Math.cos(parentLineAngle+ Math.PI / 2) * this.handleLength / 2;
         const dy = Math.sin(parentLineAngle + Math.PI / 2) * this.handleLength / 2;
@@ -256,19 +262,19 @@ class HandleLine{
         this.groupElement.appendChild(lineElement);
 
         //create Handles
-        const firstHandle = new Handle(this.svg,this.middleLine,true);
-        firstHandle.createHandle();
-        const firstHandleElement = firstHandle.getLineObject();
+        this.firstHandle = new Handle(this.svg,this.middleLine,true);
+        this.firstHandle.createHandle();
+        const firstHandleElement = this.firstHandle.getLineObject();
         this.svg.removeChild(firstHandleElement);
         this.groupElement.appendChild(firstHandleElement);
-        this.setHandleEvents(firstHandle);
+        this.setHandleEvents(this.firstHandle);
 
-        const secondHandle = new Handle(this.svg,this.middleLine,false);
-        secondHandle.createHandle();
-        const secondHandleElement = secondHandle.getLineObject();
+        this.secondHandle = new Handle(this.svg,this.middleLine,false);
+        this.secondHandle.createHandle();
+        const secondHandleElement = this.secondHandle.getLineObject();
         this.svg.removeChild(secondHandleElement);
         this.groupElement.appendChild(secondHandleElement);
-        this.setHandleEvents(secondHandle);
+        this.setHandleEvents(this.secondHandle);
 
         // Add the group to the SVG
         this.svg.appendChild(this.groupElement);
@@ -294,7 +300,6 @@ class HandleLine{
         event.stopPropagation();
 
         if(State.dragState.isHandleDragged == false){
-
             State.dragState.isHandleDragged = true;
             const target = event.currentTarget as Element;
             target.setPointerCapture(event.pointerId);
@@ -303,7 +308,10 @@ class HandleLine{
     }
 
     private handleEventPointerUp(event: PointerEvent){
-        State.dragState.isHandleDragged == false
+        State.dragState.isHandleDragged = false;
+        const target = event.currentTarget as Element;
+        target.releasePointerCapture(event.pointerId);  // Also release pointer capture
+        console.log(`handle released. isHandleDragged: ${State.dragState.isHandleDragged}`);
     }
 
     private handleEventPointerMove(event: PointerEvent, handle :Handle){
@@ -318,14 +326,49 @@ class HandleLine{
         const yAttr = handle.isFirstHandle ? 'y1' : 'y2';
 
         this.middleLine?.setLineEndPoint(pointerPosition,xAttr,yAttr);
+        this.updateHandlePosition();
         //update first and second handle positions and orientation
-}
+    }
 
-    private updateHandlePosition(movedHandle:Handle, pairedHandle: Handle){
+    private updateHandlePosition(){
         //get Parent line Point position
+        const middleLinePoint1 = this.middleLine?.getLineEndPoints()?.get("point1");
+        const middleLinePoint2 = this.middleLine?.getLineEndPoints()?.get("point2");
+
+        if (!middleLinePoint1 || !middleLinePoint2) {
+        console.warn("Unable to get line endpoints for handle position update");
+        return;
+        }
+
+        const handleLength = this.firstHandle?.handleLength ?? 24;
+        const angle = Math.atan2(middleLinePoint2.y - middleLinePoint1.y, middleLinePoint2.x - middleLinePoint1.x);
+        const dx = Math.cos(angle + Math.PI / 2) * handleLength / 2;
+        const dy = Math.sin(angle + Math.PI / 2) * handleLength / 2;
+        
+        // First handle endpoints (both relative to middleLinePoint1)
+        const firstHandlePoint1: Point = {
+            x: middleLinePoint1.x - dx,
+            y: middleLinePoint1.y - dy
+        };
+        const firstHandlePoint2: Point = {
+            x: middleLinePoint1.x + dx,
+            y: middleLinePoint1.y + dy
+        };
+
+        // Second handle endpoints (both relative to middleLinePoint2)
+        const secondHandlePoint1: Point = {
+            x: middleLinePoint2.x - dx,
+            y: middleLinePoint2.y - dy
+        };
+        const secondHandlePoint2: Point = {
+            x: middleLinePoint2.x + dx,
+            y: middleLinePoint2.y + dy
+        };
+
+        this.firstHandle?.updateLinePosition(firstHandlePoint1, firstHandlePoint2);
+        this.secondHandle?.updateLinePosition(secondHandlePoint1, secondHandlePoint2);
     }
 }
-
 
 class SvgUtils{
     static clientToSvgPoint(svgElement: SVGSVGElement, clientPoints: Point): DOMPoint{
