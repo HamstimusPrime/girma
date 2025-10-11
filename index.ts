@@ -1,7 +1,7 @@
 type DragState = {
     isHandleDragged: boolean;
     isDrawnLineDragged: boolean;
-    activeElement: SVGElement | null;
+    activeElement: SVGElement | null
 }
 
 class State {
@@ -10,6 +10,7 @@ class State {
     isDrawnLineDragged: false,
     activeElement: null
     }
+    static isDrawing : boolean = false;
 }
 
 type Point = {
@@ -19,7 +20,7 @@ type Point = {
 
 class DrawingCanvas{
     private svg: SVGSVGElement;
-    private isDrawing: boolean;
+    // private isDrawing: boolean;
     private currentLine : SVGLineElement | null;
     private previewLine : PreviewLine | null;
     private pointerPosition : Point;
@@ -27,7 +28,7 @@ class DrawingCanvas{
 
     constructor(svgElement: SVGSVGElement){
         this.svg = svgElement;
-        this.isDrawing = false;
+        // this.isDrawing = false;
         this.currentLine = null;
         this.previewLine = null;
         this.pointerPosition = {x:0, y:0};
@@ -57,11 +58,11 @@ class DrawingCanvas{
         this.pointerPosition = SvgUtils.clientToSvgPoint(this.svg, eventPosition);
         console.log("pointer down!")
 
-        if (this.isDrawing === false){
+        if (State.isDrawing === false){
             console.log("isDrawing is false!")
             this.previewLine = new PreviewLine(this.svg, this.pointerPosition);
             this.previewLine.createLineElement()
-            this.isDrawing = true;
+            State.isDrawing = true;
         }else{
             if(!this.previewLine)return;
             this.previewLine.setLineEndPoint(this.pointerPosition, "x2", "y2")
@@ -77,8 +78,11 @@ class DrawingCanvas{
             }
             console.log("juranimo")
             const handleLine = new HandleLine(this.svg, firstPreviewLinePoint, secondPreviewLinePoint);
-            handleLine.createHandleLine();
-        
+            const handleLineGroup = handleLine.createHandleLine();
+
+            this.svg.replaceChild(handleLineGroup, this.previewLine.getLineObject());
+            State.isDrawing = false;
+    
         }
     }
 }
@@ -226,6 +230,7 @@ class HandleLine{
     firstHandle : Handle | null;
     secondHandle : Handle | null;
     middleLine : Line | null;
+    groupElement : SVGGElement | null;
 
     constructor(svg: SVGSVGElement, point1:Point, point2: Point){
         this.svg = svg;
@@ -234,23 +239,48 @@ class HandleLine{
         this.firstHandle = null;
         this.secondHandle = null;
         this.middleLine = null;
+        this.groupElement = null;
     }
 
-    createHandleLine(){
+    createHandleLine(): SVGElement{
+        // Create a group element to contain all handle line elements
+        this.groupElement = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        this.groupElement.setAttribute('class', 'handle-line-group');
+        
         //create handles and Line and then setup events for both handles
         this.middleLine = new Line(this.svg,this.point1,this.point2);
-        this.middleLine.createLineElement();
+        const lineElement = this.middleLine.createLineElement();
+        
+        // Remove line from SVG and add to group instead
+        this.svg.removeChild(lineElement);
+        this.groupElement.appendChild(lineElement);
 
         //create Handles
-        const firstHandle = new Handle(this.svg,this.middleLine,true)
-        firstHandle.createHandle()
+        const firstHandle = new Handle(this.svg,this.middleLine,true);
+        firstHandle.createHandle();
+        const firstHandleElement = firstHandle.getLineObject();
+        this.svg.removeChild(firstHandleElement);
+        this.groupElement.appendChild(firstHandleElement);
         this.setHandleEvents(firstHandle);
-        //setup events for line handles
+
+        const secondHandle = new Handle(this.svg,this.middleLine,false);
+        secondHandle.createHandle();
+        const secondHandleElement = secondHandle.getLineObject();
+        this.svg.removeChild(secondHandleElement);
+        this.groupElement.appendChild(secondHandleElement);
+        this.setHandleEvents(secondHandle);
+
+        // Add the group to the SVG
+        this.svg.appendChild(this.groupElement);
+
+        return this.groupElement;
+    }
+
+    getGroupElement(): SVGGElement | null {
+        return this.groupElement;
     }
 
     setHandleEvents(handle: Handle){
-        //i have to pass Handle to each event list
-
         const handleElement = handle.getLineObject();
         handleElement.addEventListener('pointerdown', this.handleEventPointerDown.bind(this));
         handleElement.addEventListener('pointerup', this.handleEventPointerUp.bind(this));
@@ -288,7 +318,12 @@ class HandleLine{
         const yAttr = handle.isFirstHandle ? 'y1' : 'y2';
 
         this.middleLine?.setLineEndPoint(pointerPosition,xAttr,yAttr);
+        //update first and second handle positions and orientation
 }
+
+    private updateHandlePosition(movedHandle:Handle, pairedHandle: Handle){
+        //get Parent line Point position
+    }
 }
 
 
