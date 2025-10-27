@@ -56,9 +56,11 @@ class DrawingCanvas {
                 throw new Error("could not get previewLine endpoints.");
             }
             console.log("juranimo");
-            const handleLine = new HandleLine(this.svg, firstPreviewLinePoint, secondPreviewLinePoint);
-            const handleLineGroup = handleLine.createHandleLine();
-            this.svg.replaceChild(handleLineGroup, this.previewLine.getLineObject());
+            const tickHandleLine = new TickHandleLine(this.svg, firstPreviewLinePoint, secondPreviewLinePoint, 50);
+            const tickHandleLineGroup = tickHandleLine.createTickHandleLine();
+            if (tickHandleLineGroup) {
+                this.svg.replaceChild(tickHandleLineGroup, this.previewLine.getLineObject());
+            }
             State.isDrawing = false;
         }
     }
@@ -109,6 +111,16 @@ class Line {
         endPoints.set('point1', point1);
         endPoints.set('point2', point2);
         return endPoints;
+    }
+    getLineLength() {
+        const parentLinePoints = this.getLineEndPoints();
+        const firstPoint = parentLinePoints === null || parentLinePoints === void 0 ? void 0 : parentLinePoints.get("point1");
+        const secondPoint = parentLinePoints === null || parentLinePoints === void 0 ? void 0 : parentLinePoints.get("point2");
+        if (!firstPoint || !secondPoint) {
+            throw new Error("Line element is not initialized.");
+        }
+        const lineLength = Math.hypot(secondPoint.x - firstPoint.x, secondPoint.y - firstPoint.y);
+        return lineLength;
     }
     getLineAngle() {
         const parentLinePoints = this.getLineEndPoints();
@@ -171,8 +183,15 @@ class Handle extends Line {
         (_f = this.lineElement) === null || _f === void 0 ? void 0 : _f.setAttribute('y2', `${anchorPoint.y + dy}`);
     }
 }
+class Tick extends Line {
+    constructor(svg, point1, point2, tickLength) {
+        super(svg, point1, point2);
+        this.tickLength = tickLength;
+    }
+}
 class HandleLine {
     constructor(svg, point1, point2) {
+        this.handleLineEventObservers = [];
         this.svg = svg;
         this.point1 = point1;
         this.point2 = point2;
@@ -185,19 +204,20 @@ class HandleLine {
         // Create a group element to contain all handle line elements
         this.groupElement = document.createElementNS('http://www.w3.org/2000/svg', 'g');
         this.groupElement.setAttribute('class', 'handle-line-group');
-        //create handles and Line and then setup events for both handles
+        //create middle-line
         this.middleLine = new Line(this.svg, this.point1, this.point2);
         const lineElement = this.middleLine.createLineElement();
-        // Remove line from SVG and add to group instead
+        // Remove middle-line from SVG and add to group insteadyy
         this.svg.removeChild(lineElement);
         this.groupElement.appendChild(lineElement);
-        //create Handles
+        //create First Handle set its events and put it in group
         this.firstHandle = new Handle(this.svg, this.middleLine, true);
         this.firstHandle.createHandle();
         const firstHandleElement = this.firstHandle.getLineObject();
         this.svg.removeChild(firstHandleElement);
         this.groupElement.appendChild(firstHandleElement);
         this.setHandleEvents(this.firstHandle);
+        //create Second Handle set its events and put it in group
         this.secondHandle = new Handle(this.svg, this.middleLine, false);
         this.secondHandle.createHandle();
         const secondHandleElement = this.secondHandle.getLineObject();
@@ -249,7 +269,8 @@ class HandleLine {
         const yAttr = handle.isFirstHandle ? 'y1' : 'y2';
         (_a = this.middleLine) === null || _a === void 0 ? void 0 : _a.setLineEndPoint(pointerPosition, xAttr, yAttr);
         this.updateHandlePosition();
-        //update first and second handle positions and orientation
+        //notify observers that a move event has occured
+        this.notifyObservers();
     }
     updateHandlePosition() {
         var _a, _b, _c, _d, _e, _f, _g, _h;
@@ -284,6 +305,161 @@ class HandleLine {
         };
         (_g = this.firstHandle) === null || _g === void 0 ? void 0 : _g.updateLinePosition(firstHandlePoint1, firstHandlePoint2);
         (_h = this.secondHandle) === null || _h === void 0 ? void 0 : _h.updateLinePosition(secondHandlePoint1, secondHandlePoint2);
+        this.notifyObservers();
+    }
+    notifyObservers() {
+        console.log('observers notified');
+        this.handleLineEventObservers.forEach(observer => {
+            observer.updateTickPositions();
+        });
+    }
+}
+class TickHandleLine extends HandleLine {
+    constructor(svg, point1, point2, proportionUnit) {
+        super(svg, point1, point2);
+        this.proportionUnit = proportionUnit;
+        this.tickLength = 5;
+        this.tickObjectsCreated = [];
+        this.handleLineEventObservers.push(this);
+    }
+    /*need to get the length of the middle Line
+    need to know how many ticks could be created based on the length of the line
+    need to return all tick positions in an array of points.
+    need to create ticks!
+    need to update ticks on handle move
+    */
+    getNumberOfTicksToCreate() {
+        var _a;
+        if (!this.middleLine) {
+            throw new Error("Failed to create line element");
+        }
+        const numberOfTicksToCreate = Math.floor(((_a = this.middleLine) === null || _a === void 0 ? void 0 : _a.getLineLength()) / this.proportionUnit);
+        return numberOfTicksToCreate;
+    }
+    getTickPositions() {
+        var _a, _b;
+        let tickPositions = [];
+        const numberOfTicksToCreate = this.getNumberOfTicksToCreate();
+        // Calculate direction vector of the middleLine
+        const middleLineLength = (_a = this.middleLine) === null || _a === void 0 ? void 0 : _a.getLineLength();
+        const middleLinePoints = (_b = this.middleLine) === null || _b === void 0 ? void 0 : _b.getLineEndPoints();
+        const firstPoint = middleLinePoints === null || middleLinePoints === void 0 ? void 0 : middleLinePoints.get("point1");
+        const secondPoint = middleLinePoints === null || middleLinePoints === void 0 ? void 0 : middleLinePoints.get("point2");
+        if (!firstPoint || !secondPoint || !middleLineLength) {
+            throw new Error("Line element is not initialized.");
+        }
+        const dirX = (secondPoint.x - firstPoint.x) / middleLineLength;
+        const dirY = (secondPoint.y - firstPoint.y) / middleLineLength;
+        if (numberOfTicksToCreate > 0) {
+            for (let i = 1; i <= numberOfTicksToCreate; i++) {
+                // Calculate tick position along middle line
+                const distance = i * this.proportionUnit;
+                const pointX = firstPoint.x + dirX * distance;
+                const pointY = firstPoint.y + dirY * distance;
+                const tickPointPosition = {
+                    x: pointX,
+                    y: pointY
+                };
+                tickPositions.push(tickPointPosition);
+            }
+        }
+        return tickPositions;
+    }
+    createTicks() {
+        var _a, _b, _c, _d, _e, _f, _g, _h, _j;
+        // Remove any existing tick marks
+        (_a = this.groupElement) === null || _a === void 0 ? void 0 : _a.querySelectorAll('.tickmark').forEach(tick => tick.remove());
+        const tickPositions = this.getTickPositions();
+        if (tickPositions.length == 0) {
+            console.error("no tick positions, tick position array empty");
+        }
+        //get transform of the group
+        const transform = (_b = this.groupElement) === null || _b === void 0 ? void 0 : _b.getAttribute('transform');
+        let tx = 0, ty = 0;
+        if (transform) {
+            const match = transform.match(/translate\(([-\d.]+),([-\d.]+)\)/);
+            if (match) {
+                tx = parseFloat(match[1]);
+                ty = parseFloat(match[2]);
+            }
+        }
+        //get angle of middle Line and use to create ticks
+        const middleLineAngle = (_c = this.middleLine) === null || _c === void 0 ? void 0 : _c.getLineAngle();
+        //create Tick logic
+        for (let pos of tickPositions) {
+            const dx = Math.cos((middleLineAngle !== null && middleLineAngle !== void 0 ? middleLineAngle : 0) + Math.PI / 2) * this.tickLength / 2;
+            const dy = Math.sin((middleLineAngle !== null && middleLineAngle !== void 0 ? middleLineAngle : 0) + Math.PI / 2) * this.tickLength / 2;
+            const middleLinePoint1 = (_e = (_d = this.middleLine) === null || _d === void 0 ? void 0 : _d.getLineEndPoints()) === null || _e === void 0 ? void 0 : _e.get("point1");
+            const middleLinePoint2 = (_g = (_f = this.middleLine) === null || _f === void 0 ? void 0 : _f.getLineEndPoints()) === null || _g === void 0 ? void 0 : _g.get("point2");
+            if (!middleLinePoint1 || !middleLinePoint2) {
+                console.warn("Unable to get line endpoints for handle position update");
+                return [];
+            }
+            const firstTickPoint = {
+                x: (pos.x - dx - tx),
+                y: (pos.y - dy - ty)
+            };
+            const secondTickPoint = {
+                x: (pos.x + dx - tx),
+                y: (pos.y + dy - ty)
+            };
+            const tickObject = new Tick(this.svg, middleLinePoint1, middleLinePoint2, this.tickLength);
+            const tickElement = tickObject.createLineElement();
+            // Add the tickmark class so it can be properly removed later
+            tickElement.setAttribute('class', tickElement.getAttribute('class') + ' tickmark');
+            tickObject.updateLinePosition(firstTickPoint, secondTickPoint);
+            // Add tick to group Element
+            this.svg.removeChild(tickElement);
+            (_h = this.groupElement) === null || _h === void 0 ? void 0 : _h.appendChild(tickElement);
+            (_j = this.tickObjectsCreated) === null || _j === void 0 ? void 0 : _j.push(tickObject);
+        }
+        return this.tickObjectsCreated;
+    }
+    createTickHandleLine() {
+        this.createHandleLine();
+        this.createTicks();
+        return this.groupElement;
+    }
+    updateTickPositions() {
+        var _a;
+        //update the positions of the tick Marks along the middle line
+        if (!this.middleLine || !this.tickObjectsCreated)
+            return;
+        // Get the updated tick positions along the new middle line
+        const updatedTickPositions = this.getTickPositions();
+        // If the number of ticks has changed, recreate them
+        if (updatedTickPositions.length !== this.tickObjectsCreated.length) {
+            this.createTicks();
+            return;
+        }
+        // Get the current middle line angle for perpendicular tick calculation
+        const middleLineAngle = this.middleLine.getLineAngle();
+        const dx = Math.cos(middleLineAngle + Math.PI / 2) * this.tickLength / 2;
+        const dy = Math.sin(middleLineAngle + Math.PI / 2) * this.tickLength / 2;
+        // Get transform of the group (if any)
+        const transform = (_a = this.groupElement) === null || _a === void 0 ? void 0 : _a.getAttribute('transform');
+        let tx = 0, ty = 0;
+        if (transform) {
+            const matrix = new DOMMatrix(transform);
+            tx = matrix.e;
+            ty = matrix.f;
+        }
+        // Update each tick to its new position
+        for (let i = 0; i < this.tickObjectsCreated.length; i++) {
+            const tickObject = this.tickObjectsCreated[i];
+            const tickPosition = updatedTickPositions[i];
+            // Calculate the perpendicular endpoints for this tick
+            const firstTickPoint = {
+                x: tickPosition.x - dx - tx,
+                y: tickPosition.y - dy - ty
+            };
+            const secondTickPoint = {
+                x: tickPosition.x + dx - tx,
+                y: tickPosition.y + dy - ty
+            };
+            // Update this tick's position
+            tickObject.updateLinePosition(firstTickPoint, secondTickPoint);
+        }
     }
 }
 class SvgUtils {
