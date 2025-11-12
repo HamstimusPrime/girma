@@ -1,4 +1,4 @@
-"use strict";
+import { importImage } from './utils.js';
 class State {
 }
 State.dragState = {
@@ -10,7 +10,6 @@ State.isDrawing = false;
 class DrawingCanvas {
     constructor(svgElement) {
         this.svg = svgElement;
-        // this.isDrawing = false;
         this.currentLine = null;
         this.previewLine = null;
         this.pointerPosition = { x: 0, y: 0 };
@@ -207,7 +206,7 @@ class HandleLine {
         //create middle-line
         this.middleLine = new Line(this.svg, this.point1, this.point2);
         const lineElement = this.middleLine.createLineElement();
-        // Remove middle-line from SVG and add to group insteadyy
+        // Remove middle-line from SVG and add to group instead
         this.svg.removeChild(lineElement);
         this.groupElement.appendChild(lineElement);
         //create First Handle set its events and put it in group
@@ -318,16 +317,10 @@ class TickHandleLine extends HandleLine {
     constructor(svg, point1, point2, proportionUnit) {
         super(svg, point1, point2);
         this.proportionUnit = proportionUnit;
-        this.tickLength = 5;
+        this.tickLength = 14;
         this.tickObjectsCreated = [];
         this.handleLineEventObservers.push(this);
     }
-    /*need to get the length of the middle Line
-    need to know how many ticks could be created based on the length of the line
-    need to return all tick positions in an array of points.
-    need to create ticks!
-    need to update ticks on handle move
-    */
     getNumberOfTicksToCreate() {
         var _a;
         if (!this.middleLine) {
@@ -377,11 +370,9 @@ class TickHandleLine extends HandleLine {
         const transform = (_b = this.groupElement) === null || _b === void 0 ? void 0 : _b.getAttribute('transform');
         let tx = 0, ty = 0;
         if (transform) {
-            const match = transform.match(/translate\(([-\d.]+),([-\d.]+)\)/);
-            if (match) {
-                tx = parseFloat(match[1]);
-                ty = parseFloat(match[2]);
-            }
+            const matrix = new DOMMatrix(transform);
+            tx = matrix.e; // e is the horizontal translation
+            ty = matrix.f; // f is the vertical translation
         }
         //get angle of middle Line and use to create ticks
         const middleLineAngle = (_c = this.middleLine) === null || _c === void 0 ? void 0 : _c.getLineAngle();
@@ -441,8 +432,8 @@ class TickHandleLine extends HandleLine {
         let tx = 0, ty = 0;
         if (transform) {
             const matrix = new DOMMatrix(transform);
-            tx = matrix.e;
-            ty = matrix.f;
+            tx = matrix.e; //e is the horizontal axis of the matrix
+            ty = matrix.f; //f is the vertical axis of the matrix
         }
         // Update each tick to its new position
         for (let i = 0; i < this.tickObjectsCreated.length; i++) {
@@ -474,7 +465,7 @@ class SvgUtils {
 }
 // Initialize app when DOM is fully loaded
 function initializeApp() {
-    const svg = document.getElementById('svg');
+    const svg = document.getElementById('svg_canvas');
     if (!(svg instanceof SVGSVGElement)) {
         console.log('SVG element not found');
         return;
@@ -485,4 +476,5 @@ function initializeApp() {
 //App entry point
 document.addEventListener('DOMContentLoaded', () => {
     const app = initializeApp();
+    importImage(); // Initialize image import functionality
 });

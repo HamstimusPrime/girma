@@ -13,7 +13,7 @@
   "compilerOptions": {
     "lib": ["esnext", "dom", "dom.iterable"],
     "target": "es2015",
-    "module": "none",
+    "module": "es6",
     "moduleResolution": "node",
     "strict": true,
     "esModuleInterop": true,
@@ -23,6 +23,11 @@
     "noEmit": false,
     "isolatedModules": false
   },
-  "include": ["*.ts"],
+  "include": [
+    "*.ts",
+    "ui_test/ms.ts",
+    "component implementation/components-architecture.ts",
+    "component implementation/components-example.ts"
+  ],
   "exclude": ["node_modules"]
 }

@@ -1,8 +1,12 @@
+import {ImageObject, importImage} from './utils.js'
+
 type DragState = {
     isHandleDragged: boolean;
     isDrawnLineDragged: boolean;
     activeElement: SVGElement | null
 }
+
+
 
 class State {
     static dragState: DragState = {
@@ -11,6 +15,7 @@ class State {
     activeElement: null
     }
     static isDrawing : boolean = false;
+    static images : ImageObject[];
 }
 
 type Point = {
@@ -18,9 +23,9 @@ type Point = {
     y: number;
 }
 
+
 class DrawingCanvas{
     private svg: SVGSVGElement;
-    // private isDrawing: boolean;
     private currentLine : SVGLineElement | null;
     private previewLine : PreviewLine | null;
     private pointerPosition : Point;
@@ -28,7 +33,6 @@ class DrawingCanvas{
 
     constructor(svgElement: SVGSVGElement){
         this.svg = svgElement;
-        // this.isDrawing = false;
         this.currentLine = null;
         this.previewLine = null;
         this.pointerPosition = {x:0, y:0};
@@ -281,7 +285,7 @@ class HandleLine{
         this.middleLine = new Line(this.svg,this.point1,this.point2);
         const lineElement = this.middleLine.createLineElement();
         
-        // Remove middle-line from SVG and add to group insteadyy
+        // Remove middle-line from SVG and add to group instead
         this.svg.removeChild(lineElement);
         this.groupElement.appendChild(lineElement);
 
@@ -413,18 +417,11 @@ class TickHandleLine extends HandleLine{
     constructor(svg: SVGSVGElement, point1:Point, point2: Point, proportionUnit: number){
         super(svg, point1, point2); 
         this.proportionUnit = proportionUnit;
-        this.tickLength = 5
+        this.tickLength = 14
         this.tickObjectsCreated = []
         this.handleLineEventObservers.push(this)
     }
-    /*need to get the length of the middle Line
-    need to know how many ticks could be created based on the length of the line
-    need to return all tick positions in an array of points.
-    need to create ticks!
-    need to update ticks on handle move
-    */
 
-    
     getNumberOfTicksToCreate(){
         if (!this.middleLine) {
             throw new Error("Failed to create line element");
@@ -595,7 +592,7 @@ class SvgUtils{
 
 // Initialize app when DOM is fully loaded
 function initializeApp(){
-    const svg = document.getElementById('svg');
+    const svg = document.getElementById('svg_canvas');
     if (!(svg instanceof SVGSVGElement)){
         console.log('SVG element not found');
         return;
@@ -607,4 +604,5 @@ function initializeApp(){
 //App entry point
 document.addEventListener('DOMContentLoaded', ()=>{
     const app = initializeApp();
+    importImage(); // Initialize image import functionality
 })
