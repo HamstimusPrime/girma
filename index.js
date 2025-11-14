@@ -471,10 +471,11 @@ function initializeApp() {
         return;
     }
     const canvas = new DrawingCanvas(svg);
+    importImage(svg);
     return canvas;
 }
 //App entry point
 document.addEventListener('DOMContentLoaded', () => {
     const app = initializeApp();
-    importImage(); // Initialize image import functionality
+    // Initialize image import functionality
 });
